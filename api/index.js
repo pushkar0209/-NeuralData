@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -96,7 +95,7 @@ app.post('/api/sources/connect', (req, res) => {
     }
 });
 
-// POST to add an alert manually (e.g. from setTimeout simulation on frontend)
+// POST to add an alert manually
 app.post('/api/alerts', (req, res) => {
     const { type, message } = req.body;
     const newAlert = {
@@ -140,7 +139,8 @@ app.put('/api/settings', (req, res) => {
 
 // POST simulate full audit
 app.post('/api/audit', (req, res) => {
-    // Simulate network latency and processing time
+    // Vercel serverless doesn't need long setTimeouts, but we can simulate a small 500ms delay 
+    // to give the frontend animation time to breathe before returning.
     setTimeout(() => {
         const newAlert = {
             id: Date.now(),
@@ -153,38 +153,36 @@ app.post('/api/audit', (req, res) => {
         updateTrustHistory(globalTrustScore);
 
         res.json({ success: true, alerts, globalTrustScore, trustHistory });
-    }, 2000); // 2s simulated audit
+    }, 500);
 });
 
 // POST simulate AI chat
 app.post('/api/chat', (req, res) => {
     const { message, connectedSources, globalTrustScore, settings } = req.body;
 
-    setTimeout(() => {
-        const query = message.toLowerCase();
-        let responseText = "";
+    const query = message.toLowerCase();
+    let responseText = "";
 
-        if (query.includes('source') || query.includes('connect')) {
-            if (!connectedSources || connectedSources.length === 0) {
-                responseText = "There are currently **no data sources** connected. Please navigate to the Data Sources page to connect PostgreSQL, Snowflake, MongoDB, or S3.";
-            } else {
-                const sourceNames = connectedSources.map(s => `\n- **${s.name}** (${s.type})`).join('');
-                responseText = `Currently, the following systems are connected and analyzed in the knowledge layer:${sourceNames}\n\nI am actively monitoring these sources for schema changes and PII.`;
-            }
-        } else if (query.includes('trust') || query.includes('score')) {
-            responseText = `The Global Trust Score is currently at **${globalTrustScore}%**.\n\n> **Trust Warning**: If the score is below 90%, it indicates recent SLA misses or potential PII leaks. Check the Dashboard for detailed metrics.`;
-        } else if (query.includes('pii') || query.includes('sensitive') || query.includes('redact')) {
-            if (settings && settings.autoPiiRedact) {
-                responseText = "PII Auto-redaction is currently **ENABLED** in your governance settings. If I detect SSNs, emails, or phone numbers in your data, they will be masked automatically before being displayed.";
-            } else {
-                responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
-            }
+    if (query.includes('source') || query.includes('connect')) {
+        if (!connectedSources || connectedSources.length === 0) {
+            responseText = "There are currently **no data sources** connected. Please navigate to the Data Sources page to connect PostgreSQL, Snowflake, MongoDB, or S3.";
         } else {
-            responseText = `Based on the schema extracted from your connected sources, the \`customer_ltv\` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this? You asked: "${message}"`;
+            const sourceNames = connectedSources.map(s => `\n- **${s.name}** (${s.type})`).join('');
+            responseText = `Currently, the following systems are connected and analyzed in the knowledge layer:${sourceNames}\n\nI am actively monitoring these sources for schema changes and PII.`;
         }
+    } else if (query.includes('trust') || query.includes('score')) {
+        responseText = `The Global Trust Score is currently at **${globalTrustScore}%**.\n\n> **Trust Warning**: If the score is below 90%, it indicates recent SLA misses or potential PII leaks. Check the Dashboard for detailed metrics.`;
+    } else if (query.includes('pii') || query.includes('sensitive') || query.includes('redact')) {
+        if (settings && settings.autoPiiRedact) {
+            responseText = "PII Auto-redaction is currently **ENABLED** in your governance settings. If I detect SSNs, emails, or phone numbers in your data, they will be masked automatically before being displayed.";
+        } else {
+            responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
+        }
+    } else {
+        responseText = `Based on the schema extracted from your connected sources, the \`customer_ltv\` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this? You asked: "${message}"`;
+    }
 
-        res.json({ success: true, text: responseText });
-    }, 1000); // 1s simulation
+    res.json({ success: true, text: responseText });
 });
 
 function updateTrustHistory(newScore) {
@@ -193,6 +191,4 @@ function updateTrustHistory(newScore) {
     trustHistory = [...trustHistory.slice(1), { name: 'Today', score: newScore }];
 }
 
-app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
-});
+export default app;

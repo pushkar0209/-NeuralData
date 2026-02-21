@@ -27,12 +27,22 @@ const itemVariants = {
 };
 
 const DashboardPage = () => {
-    const { globalTrustScore, trustHistory, alerts, connectedSources } = useIntelligence();
+    const { globalTrustScore, trustHistory, alerts, connectedSources, runAudit } = useIntelligence();
     const [mounted, setMounted] = useState(false);
+    const [isAuditing, setIsAuditing] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    const handleAudit = async () => {
+        setIsAuditing(true);
+        // Add a slight artificial delay for the UI animation even if the network is fast
+        setTimeout(async () => {
+            await runAudit();
+            setIsAuditing(false);
+        }, 800);
+    };
 
     return (
         <motion.div
@@ -47,16 +57,20 @@ const DashboardPage = () => {
                     <p className="page-subtitle">Real-time monitoring of your unified data knowledge layer.</p>
                 </div>
                 <motion.button
-                    className="primary-btn pulse-glow-btn"
+                    className={`primary-btn pulse-glow-btn ${isAuditing ? 'auditing' : ''}`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={handleAudit}
+                    disabled={isAuditing}
                 >
-                    <Activity size={18} />
-                    <span>Run Full Audit</span>
+                    <Activity size={18} className={isAuditing ? 'spin' : ''} />
+                    <span>{isAuditing ? 'Auditing Systems...' : 'Run Full Audit'}</span>
                 </motion.button>
             </motion.div>
 
-            <motion.div className="stats-row" variants={containerVariants}>
+            {isAuditing && <div className="global-scanning-laser"></div>}
+
+            <motion.div className={`stats-row ${isAuditing ? 'blur-sm' : ''}`} variants={containerVariants}>
                 {/* Stat Card 1 */}
                 <motion.div
                     className="stat-card glass-panel interactive-card"

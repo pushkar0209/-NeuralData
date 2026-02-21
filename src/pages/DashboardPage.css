@@ -73,6 +73,57 @@
     color: var(--text-secondary);
 }
 
+.stat-icon svg {
+    color: currentColor;
+}
+
+.auditing {
+    opacity: 0.8;
+    cursor: wait !important;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+.global-scanning-laser {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    box-shadow: 0 0 20px var(--accent-primary), 0 0 40px var(--accent-primary);
+    z-index: 9999;
+    animation: scanDown 2.5s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes scanDown {
+    0% {
+        top: 0;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    90% {
+        opacity: 1;
+    }
+
+    100% {
+        top: 100vh;
+        opacity: 0;
+    }
+}
+
+.blur-sm {
+    filter: blur(2px);
+    transition: filter 0.3s ease;
+}
+
 .stat-icon {
     width: 40px;
     height: 40px;
@@ -414,11 +465,11 @@
         grid-template-columns: 1fr;
         height: auto;
     }
-    
+
     .chart-card {
         min-height: 400px;
     }
-    
+
     .page-header {
         flex-direction: column;
         align-items: flex-start;
@@ -430,12 +481,12 @@
     .stats-row {
         grid-template-columns: 1fr;
     }
-    
+
     .dashboard-container {
         padding: 1rem;
         gap: 1.5rem;
     }
-    
+
     .feed-item {
         flex-direction: column;
         gap: 0.75rem;

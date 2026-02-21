@@ -22,7 +22,7 @@ const itemVariants = {
 };
 
 const AssistantPage = () => {
-    const { connectedSources, globalTrustScore, settings } = useIntelligence();
+    const { connectedSources, sendMessage } = useIntelligence();
     const [messages, setMessages] = useState(initialMessages);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -36,7 +36,7 @@ const AssistantPage = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    const handleSend = (e, presetText = null) => {
+    const handleSend = async (e, presetText = null) => {
         if (e) e.preventDefault();
         const textToSend = presetText || inputValue;
         if (!textToSend.trim()) return;
@@ -46,34 +46,18 @@ const AssistantPage = () => {
         setInputValue('');
         setIsTyping(true);
 
-        // Dynamic AI response reasoning
-        setTimeout(() => {
-            const query = textToSend.toLowerCase();
-            let responseText = "";
+        // Fetch AI response from backend
+        const response = await sendMessage(textToSend);
 
-            if (query.includes('source') || query.includes('connect')) {
-                if (connectedSources.length === 0) {
-                    responseText = "There are currently **no data sources** connected. Please navigate to the Data Sources page to connect PostgreSQL, Snowflake, MongoDB, or S3.";
-                } else {
-                    const sourceNames = connectedSources.map(s => `\n- **${s.name}** (${s.type})`).join('');
-                    responseText = `Currently, the following systems are connected and analyzed in the knowledge layer:${sourceNames}\n\nI am actively monitoring these sources for schema changes and PII.`;
-                }
-            } else if (query.includes('trust') || query.includes('score')) {
-                responseText = `The Global Trust Score is currently at **${globalTrustScore}%**.\n\n> **Trust Warning**: If the score is below 90%, it indicates recent SLA misses or potential PII leaks. Check the Dashboard for detailed metrics.`;
-            } else if (query.includes('pii') || query.includes('sensitive')) {
-                if (settings.autoPiiRedact) {
-                    responseText = "PII Auto-redaction is currently **ENABLED** in your governance settings. If I detect SSNs, emails, or phone numbers in your data, they will be masked automatically before being displayed.";
-                } else {
-                    responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
-                }
-            } else {
-                responseText = "Based on the schema extracted from `analytics_prod.users`, the `customer_ltv` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this?";
-            }
+        const newAiMsg = {
+            id: Date.now() + 1,
+            type: 'assistant',
+            text: response.text || "An error occurred.",
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
 
-            const newAiMsg = { id: Date.now() + 1, type: 'assistant', text: responseText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-            setMessages(prev => [...prev, newAiMsg]);
-            setIsTyping(false);
-        }, 1500);
+        setMessages(prev => [...prev, newAiMsg]);
+        setIsTyping(false);
     };
 
     const renderMessageContent = (text) => {

@@ -72,6 +72,39 @@ export const IntelligenceProvider = ({ children }) => {
         }
     };
 
+    const runAudit = async () => {
+        try {
+            const res = await fetch('/api/audit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAlerts(data.alerts);
+                setGlobalTrustScore(data.globalTrustScore);
+                setTrustHistory(data.trustHistory);
+            }
+            return data;
+        } catch (error) {
+            console.error('Error running audit:', error);
+            return { success: false };
+        }
+    };
+
+    const sendMessage = async (message) => {
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, connectedSources, globalTrustScore, settings })
+            });
+            return await res.json();
+        } catch (error) {
+            console.error('Error sending message:', error);
+            return { success: false, text: "I'm sorry, I'm having trouble connecting to the neural engine right now." };
+        }
+    };
+
     const updateTrustScore = async (change) => {
         try {
             const res = await fetch('/api/trust', {
@@ -144,6 +177,8 @@ export const IntelligenceProvider = ({ children }) => {
         testConnection,
         toggleSetting,
         addAlert,
+        runAudit,
+        sendMessage,
         loading
     };
 
