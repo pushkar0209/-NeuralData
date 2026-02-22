@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.use(cors());
 app.use(express.json());
@@ -211,6 +210,8 @@ Connected Data Sources: ${sourceNames}
 Governance Settings: ${JSON.stringify(settings)}
 
 Your goal is to help users understand their data, governance alerts, and trust score. You should keep responses concise and formatted in Markdown. If the user asks about PII, trust score, or connected sources, use the provided context to answer. If no sources are connected, advise them to connect sources first.`;
+
+        const ai = new GoogleGenAI({ apiKey: apiKey });
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
