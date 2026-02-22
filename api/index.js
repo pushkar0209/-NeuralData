@@ -178,6 +178,13 @@ app.post('/api/chat', (req, res) => {
         } else {
             responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
         }
+    } else if (query.includes('reliability') || query.includes('dataset has low') || query.includes('low reliability')) {
+        const hasMongo = connectedSources && connectedSources.find(s => s.id === 'mongodb');
+        if (hasMongo) {
+            responseText = "Looking at your connected sources, the **MongoDB - Users** dataset currently has the lowest reliability score (**78%**). \n\nThis is primarily due to several missing fields in the `address` sub-document and inconsistent date formatting (mixing ISODate and string types). I recommend enforcing a strict JSON schema validation rule.";
+        } else {
+            responseText = "Based on the metrics, none of your currently connected datasets are displaying dangerously low reliability. Everything is operating above the 92% SLA threshold. Connect more sources to expand the audit scope.";
+        }
     } else {
         responseText = `Based on the schema extracted from your connected sources, the \`customer_ltv\` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this? You asked: "${message}"`;
     }

@@ -5,6 +5,9 @@ const IntelligenceContext = createContext();
 export const useIntelligence = () => useContext(IntelligenceContext);
 
 export const IntelligenceProvider = ({ children }) => {
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return localStorage.getItem('isAuthenticated') === 'true';
+    });
     const [connectedSources, setConnectedSources] = useState([]);
     const [availableSources, setAvailableSources] = useState([]);
     const [globalTrustScore, setGlobalTrustScore] = useState(0);
@@ -166,7 +169,20 @@ export const IntelligenceProvider = ({ children }) => {
         }
     };
 
+    const login = () => {
+        setIsAuthenticated(true);
+        localStorage.setItem('isAuthenticated', 'true');
+    };
+
+    const logout = () => {
+        setIsAuthenticated(false);
+        localStorage.removeItem('isAuthenticated');
+    };
+
     const value = {
+        isAuthenticated,
+        login,
+        logout,
         connectedSources,
         availableSources,
         globalTrustScore,
