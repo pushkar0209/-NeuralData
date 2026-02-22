@@ -114,6 +114,42 @@ app.post('/api/alerts', (req, res) => {
     res.json({ success: true, alerts });
 });
 
+// POST to add a new available source
+app.post('/api/sources/available', (req, res) => {
+    const { name, type, color, bg } = req.body;
+
+    if (!name || !type) {
+        return res.status(400).json({ error: 'Name and type are required' });
+    }
+
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+    // Check if it already exists
+    if (availableSources.find(s => s.id === id)) {
+        return res.status(400).json({ error: 'A source with a similar name already exists' });
+    }
+
+    const newSource = {
+        id,
+        name,
+        type,
+        color: color || '#888888',
+        bg: bg || 'rgba(136, 136, 136, 0.15)'
+    };
+
+    availableSources.push(newSource);
+
+    const newAlert = {
+        id: Date.now(),
+        type: 'info',
+        message: `New data source registered: ${name}`,
+        time: 'Just now'
+    };
+    alerts = [newAlert, ...alerts].slice(0, 10);
+
+    res.json({ success: true, availableSources, alerts });
+});
+
 // POST to update trust score
 app.post('/api/trust', (req, res) => {
     const { change } = req.body;
@@ -167,37 +203,7 @@ app.post('/api/chat', async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey.trim() === "") {
-        // Fallback to mock simulator if no API key is provided
-        return setTimeout(() => {
-            const query = message.toLowerCase();
-            let responseText = "";
-            if (query.includes('source') || query.includes('connect')) {
-                if (!connectedSources || connectedSources.length === 0) {
-                    responseText = "There are currently **no data sources** connected. Please navigate to the Data Sources page to connect PostgreSQL, Snowflake, MongoDB, or S3.";
-                } else {
-                    const sourceNames = connectedSources.map(s => `\n- **${s.name}** (${s.type})`).join('');
-                    responseText = `Currently, the following systems are connected and analyzed in the knowledge layer:${sourceNames}\n\nI am actively monitoring these sources for schema changes and PII.`;
-                }
-            } else if (query.includes('trust') || query.includes('score')) {
-                responseText = `The Global Trust Score is currently at **${globalTrustScore}%**.\n\n> **Trust Warning**: If the score is below 90%, it indicates recent SLA misses or potential PII leaks. Check the Dashboard for detailed metrics.`;
-            } else if (query.includes('pii') || query.includes('sensitive') || query.includes('redact')) {
-                if (settings && settings.autoPiiRedact) {
-                    responseText = "PII Auto-redaction is currently **ENABLED** in your governance settings. If I detect SSNs, emails, or phone numbers in your data, they will be masked automatically before being displayed.";
-                } else {
-                    responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
-                }
-            } else if (query.includes('reliability') || query.includes('dataset has low') || query.includes('low reliability')) {
-                const hasMongo = connectedSources && connectedSources.find(s => s.id === 'mongodb');
-                if (hasMongo) {
-                    responseText = "Looking at your connected sources, the **MongoDB - Users** dataset currently has the lowest reliability score (**78%**). \n\nThis is primarily due to several missing fields in the `address` sub-document and inconsistent date formatting (mixing ISODate and string types). I recommend enforcing a strict JSON schema validation rule.";
-                } else {
-                    responseText = "Based on the metrics, none of your currently connected datasets are displaying dangerously low reliability. Everything is operating above the 92% SLA threshold. Connect more sources to expand the audit scope.";
-                }
-            } else {
-                responseText = `Based on the schema extracted from your connected sources, the \`customer_ltv\` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this? You asked: "${message}"`;
-            }
-            res.json({ success: true, text: `[MOCK MODE - NO API KEY FOUND]\n\n${responseText}` });
-        }, 1000);
+        return res.status(401).json({ success: false, text: "Gemini API key is not configured. Please add GEMINI_API_KEY to your backend .env file." });
     }
 
     try {
@@ -222,8 +228,8 @@ Your goal is to help users understand their data, governance alerts, and trust s
 
         res.json({ success: true, text: response.text });
     } catch (error) {
-        console.error("Gemini API Error:", error);
-        res.status(500).json({ success: false, text: "Error connecting to AI. Please ensure GEMINI_API_KEY is properly set in the backend environment." });
+        console.error("Gemini API Error:", error.message || error);
+        res.status(500).json({ success: false, text: "Error communicating with the Gemini AI engine. Please ensure your API key is valid." });
     }
 });
 

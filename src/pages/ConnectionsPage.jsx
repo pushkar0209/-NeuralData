@@ -3,6 +3,7 @@ import { Database, ShieldAlert, CheckCircle2, ArrowRight, HardDrive, Cloud, Serv
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIntelligence } from '../context/IntelligenceContext';
 import ConnectionModal from '../components/ConnectionModal';
+import AddSourceModal from '../components/AddSourceModal';
 import './ConnectionsPage.css';
 
 const terminalLines = [
@@ -40,6 +41,7 @@ const ConnectionsPage = () => {
     const [logs, setLogs] = useState([]);
     const [progress, setProgress] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
     const [selectedSourceForModal, setSelectedSourceForModal] = useState(null);
 
     const handleOpenModal = (source) => {
@@ -92,7 +94,7 @@ const ConnectionsPage = () => {
                     className="primary-btn pulse-glow-btn"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={scrollToGrid}
+                    onClick={() => setIsAddSourceModalOpen(true)}
                 >
                     <Database size={18} />
                     <span>Add New Source</span>
@@ -221,6 +223,11 @@ const ConnectionsPage = () => {
                 onClose={() => setIsModalOpen(false)}
                 source={selectedSourceForModal}
                 onConnect={handleConnectFromModal}
+            />
+
+            <AddSourceModal
+                isOpen={isAddSourceModalOpen}
+                onClose={() => setIsAddSourceModalOpen(false)}
             />
         </motion.div>
     );

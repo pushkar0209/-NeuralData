@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -99,7 +101,7 @@ app.post('/api/sources/connect', (req, res) => {
     }
 });
 
-// POST to add an alert manually
+// POST to add an alert manually (e.g. from setTimeout simulation on frontend)
 app.post('/api/alerts', (req, res) => {
     const { type, message } = req.body;
     const newAlert = {
@@ -110,6 +112,42 @@ app.post('/api/alerts', (req, res) => {
     };
     alerts = [newAlert, ...alerts].slice(0, 10);
     res.json({ success: true, alerts });
+});
+
+// POST to add a new available source
+app.post('/api/sources/available', (req, res) => {
+    const { name, type, color, bg } = req.body;
+
+    if (!name || !type) {
+        return res.status(400).json({ error: 'Name and type are required' });
+    }
+
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+    // Check if it already exists
+    if (availableSources.find(s => s.id === id)) {
+        return res.status(400).json({ error: 'A source with a similar name already exists' });
+    }
+
+    const newSource = {
+        id,
+        name,
+        type,
+        color: color || '#888888',
+        bg: bg || 'rgba(136, 136, 136, 0.15)'
+    };
+
+    availableSources.push(newSource);
+
+    const newAlert = {
+        id: Date.now(),
+        type: 'info',
+        message: `New data source registered: ${name}`,
+        time: 'Just now'
+    };
+    alerts = [newAlert, ...alerts].slice(0, 10);
+
+    res.json({ success: true, availableSources, alerts });
 });
 
 // POST to update trust score
@@ -143,8 +181,7 @@ app.put('/api/settings', (req, res) => {
 
 // POST simulate full audit
 app.post('/api/audit', (req, res) => {
-    // Vercel serverless doesn't need long setTimeouts, but we can simulate a small 500ms delay 
-    // to give the frontend animation time to breathe before returning.
+    // Simulate network latency and processing time
     setTimeout(() => {
         const newAlert = {
             id: Date.now(),
@@ -157,54 +194,16 @@ app.post('/api/audit', (req, res) => {
         updateTrustHistory(globalTrustScore);
 
         res.json({ success: true, alerts, globalTrustScore, trustHistory });
-    }, 500);
+    }, 2000); // 2s simulated audit
 });
-
-// Helper for robust mock fallback
-const generateMockFallback = async (res, message, connectedSources, globalTrustScore, settings) => {
-    // Await 500ms to simulate network processing
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const query = message.toLowerCase();
-    let responseText = "";
-
-    if (query.includes('source') || query.includes('connect')) {
-        if (!connectedSources || connectedSources.length === 0) {
-            responseText = "There are currently **no data sources** connected. Please navigate to the Data Sources page to connect PostgreSQL, Snowflake, MongoDB, or S3.";
-        } else {
-            const sourceNames = connectedSources.map(s => `\n- **${s.name}** (${s.type})`).join('');
-            responseText = `Currently, the following systems are connected and analyzed in the knowledge layer:${sourceNames}\n\nI am actively monitoring these sources for schema changes and PII.`;
-        }
-    } else if (query.includes('trust') || query.includes('score')) {
-        responseText = `The Global Trust Score is currently at **${globalTrustScore}%**.\n\n> **Trust Warning**: If the score is below 90%, it indicates recent SLA misses or potential PII leaks. Check the Dashboard for detailed metrics.`;
-    } else if (query.includes('pii') || query.includes('sensitive') || query.includes('redact')) {
-        if (settings && settings.autoPiiRedact) {
-            responseText = "PII Auto-redaction is currently **ENABLED** in your governance settings. If I detect SSNs, emails, or phone numbers in your data, they will be masked automatically before being displayed.";
-        } else {
-            responseText = "PII Auto-redaction is currently **DISABLED**. \n\n> **Trust Warning**: Unmasked PII may be exposed in query results. Please review your Data Governance settings.";
-        }
-    } else if (query.includes('reliability') || query.includes('dataset has low') || query.includes('low reliability')) {
-        const hasMongo = connectedSources && connectedSources.find(s => s.id === 'mongodb');
-        if (hasMongo) {
-            responseText = "Looking at your connected sources, the **MongoDB - Users** dataset currently has the lowest reliability score (**78%**). \n\nThis is primarily due to several missing fields in the `address` sub-document and inconsistent date formatting (mixing ISODate and string types). I recommend enforcing a strict JSON schema validation rule.";
-        } else {
-            responseText = "Based on the metrics, none of your currently connected datasets are displaying dangerously low reliability. Everything is operating above the 92% SLA threshold. Connect more sources to expand the audit scope.";
-        }
-    } else {
-        responseText = `Based on the schema extracted from your connected sources, the \`customer_ltv\` column represents the Lifetime Value of a customer calculated over a 12-month trailing period. Would you like me to generate a SQL query relating to this? You asked: "${message}"`;
-    }
-
-    return res.json({ success: true, text: `[MOCK MODE ACTIVE]\n\n${responseText}` });
-};
 
 // POST AI chat using Gemini API
 app.post('/api/chat', async (req, res) => {
     const { message, connectedSources, globalTrustScore, settings } = req.body;
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined" || apiKey.includes("your_actual_api_key")) {
-        // Fallback to mock simulator if no API key is provided
-        return await generateMockFallback(res, message, connectedSources, globalTrustScore, settings);
+    if (!apiKey || apiKey.trim() === "") {
+        return res.status(401).json({ success: false, text: "Gemini API key is not configured. Please add GEMINI_API_KEY to your backend .env file." });
     }
 
     try {
@@ -219,8 +218,6 @@ Governance Settings: ${JSON.stringify(settings)}
 
 Your goal is to help users understand their data, governance alerts, and trust score. You should keep responses concise and formatted in Markdown. If the user asks about PII, trust score, or connected sources, use the provided context to answer. If no sources are connected, advise them to connect sources first.`;
 
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: message,
@@ -229,11 +226,10 @@ Your goal is to help users understand their data, governance alerts, and trust s
             }
         });
 
-        return res.json({ success: true, text: response.text });
+        res.json({ success: true, text: response.text });
     } catch (error) {
-        console.error("Gemini API Error:", error.message);
-        // If the API throws an error (e.g., invalid key, quota exceeded), gracefully fallback instead of crashing the UI
-        return await generateMockFallback(res, message, connectedSources, globalTrustScore, settings);
+        console.error("Gemini API Error:", error.message || error);
+        res.status(500).json({ success: false, text: "Error communicating with the Gemini AI engine. Please ensure your API key is valid." });
     }
 });
 

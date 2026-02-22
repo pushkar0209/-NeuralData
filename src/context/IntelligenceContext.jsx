@@ -169,6 +169,27 @@ export const IntelligenceProvider = ({ children }) => {
         }
     };
 
+    const addAvailableSource = async (name, type, color, bg) => {
+        try {
+            const res = await fetch('/api/sources/available', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, type, color, bg })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setAvailableSources(data.availableSources);
+                setAlerts(data.alerts);
+                return { success: true };
+            } else {
+                return { success: false, error: data.error };
+            }
+        } catch (error) {
+            console.error('Error adding available source:', error);
+            return { success: false, error: 'Network error preventing adding a new source.' };
+        }
+    };
+
     const login = () => {
         setIsAuthenticated(true);
         localStorage.setItem('isAuthenticated', 'true');
@@ -195,6 +216,7 @@ export const IntelligenceProvider = ({ children }) => {
         addAlert,
         runAudit,
         sendMessage,
+        addAvailableSource,
         loading
     };
 
